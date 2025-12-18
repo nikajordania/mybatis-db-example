@@ -4,79 +4,85 @@ import com.github.javafaker.Faker;
 import ge.nikazhordania.config.BaseConfig;
 import ge.nikazhordania.db.mapper.*;
 import ge.nikazhordania.db.models.*;
+import org.apache.ibatis.session.SqlSession;
 
 import java.time.LocalDate;
 import java.util.List;
+
+import static ge.nikazhordania.config.BaseConfig.sqlSessionFactory;
 
 public class HrService {
 
     public static void main(String[] args) {
 
-        Faker faker = new Faker(); // to generate random data
+        Faker faker = new Faker();
 
-        // Initialize mappers to work with the database tables
-        CompanyMapper companyMapper = BaseConfig.companyMapper();
-        DepartmentMapper departmentMapper = BaseConfig.departmentMapper();
-        EmployeeMapper employeeMapper = BaseConfig.employeeMapper();
-        ProjectMapper projectMapper = BaseConfig.projectMapper();
-        EmployeeProjectMapper employeeProjectMapper = BaseConfig.employeeProjectMapper();
+        try (SqlSession session = sqlSessionFactory.openSession()) {
 
-        // 1. Insert company object
-        Company company = new Company(faker.company().name());
+            CompanyMapper companyMapper = session.getMapper(CompanyMapper.class);
 
-        // Note: company.getId() will be null before insertion, it will be populated after insertion
-        companyMapper.insert(company);
+            // 1. Company
+            Company company = new Company(faker.company().name());
+            companyMapper.insert(company);
 
-        // 2. Insert department
-        Department department = new Department(faker.company().industry(), company.getId());
-        departmentMapper.insert(department);
+            // 2. Department
+            DepartmentMapper departmentMapper = session.getMapper(DepartmentMapper.class);
 
-        // 3. Insert manager
-        Employee manager = new Employee();
-        manager.setName(faker.name().fullName());
-        manager.setDepartmentId(department.getId());
-        manager.setManagerId(null);
-        manager.setPhone(faker.phoneNumber().cellPhone());
-        manager.setAddress(faker.address().fullAddress());
-        manager.setSalary(200.0);
-        manager.setEmail(faker.internet().emailAddress());
-        manager.setBirthDate(LocalDate.parse("1990-01-01"));
+            Department department = new Department(faker.company().industry(), company.getId());
+            departmentMapper.insert(department);
 
-        employeeMapper.insert(manager);
+            // 3. Manager
+            EmployeeMapper employeeMapper = session.getMapper(EmployeeMapper.class);
 
-        // 4. Insert employee under the manager
-        Employee employee = new Employee();
-        employee.setName(faker.name().fullName());
-        employee.setDepartmentId(department.getId());
-        employee.setManagerId(manager.getId());
-        employee.setPhone(faker.phoneNumber().cellPhone());
-        employee.setAddress(faker.address().fullAddress());
-        employee.setSalary(100.0);
-        employee.setEmail(faker.internet().emailAddress());
-        employee.setBirthDate(LocalDate.parse("1990-01-01"));
+            Employee manager = new Employee();
+            manager.setName(faker.name().fullName());
+            manager.setDepartmentId(department.getId());
+            manager.setPhone(faker.phoneNumber().cellPhone());
+            manager.setAddress(faker.address().fullAddress());
+            manager.setSalary(200.0);
+            manager.setEmail(faker.internet().emailAddress());
+            manager.setBirthDate(LocalDate.of(1990, 1, 1));
 
-        employeeMapper.insert(employee);
+            employeeMapper.insert(manager);
 
-        // 5. Insert project
-        Project project = new Project(faker.app().name());
-        projectMapper.insert(project);
+            // 4. Employee
+            Employee employee = new Employee();
+            employee.setName(faker.name().fullName());
+            employee.setDepartmentId(department.getId());
+            employee.setManagerId(manager.getId());
+            employee.setPhone(faker.phoneNumber().cellPhone());
+            employee.setAddress(faker.address().fullAddress());
+            employee.setSalary(100.0);
+            employee.setEmail(faker.internet().emailAddress());
+            employee.setBirthDate(LocalDate.of(1990, 1, 1));
 
-        // 6. Assign employee to project
-        employeeProjectMapper.assignEmployeeToProject(employee.getId(), project.getId());
+            employeeMapper.insert(employee);
 
-        // 7. Fetch and print assigned projects
-        List<Project> projects = employeeProjectMapper.findProjectsByEmployeeId(employee.getId());
-        projects.forEach(p -> System.out.println("Project: " + p.getName()));
+            // 5. Project
+            ProjectMapper projectMapper = session.getMapper(ProjectMapper.class);
 
-        // 8. Fetch and print employee project info
-        List<EmployeeProjectInfo> infoList = employeeMapper.getEmployeeProjectInfo(employee.getId());
+            Project project = new Project(faker.app().name());
+            projectMapper.insert(project);
 
-        EmployeeProjectInfo firstUserInfo = infoList.getFirst();
-        System.out.println("Employee ID: " + firstUserInfo.getEmployeeId());
-        System.out.println("Employee Name: " + firstUserInfo.getEmployeeName());
-        System.out.println("Project ID: " + firstUserInfo.getProjectId());
-        System.out.println("Project Name: " + firstUserInfo.getProjectName());
-        System.out.println("Department Name: " + firstUserInfo.getDepartmentName());
-        System.out.println("Company Name: " + firstUserInfo.getCompanyName());
+            // 6. Assign
+            EmployeeProjectMapper employeeProjectMapper = session.getMapper(EmployeeProjectMapper.class);
+            employeeProjectMapper.assignEmployeeToProject(employee.getId(), project.getId());
+
+            // 7. Projects
+            List<Project> projects = employeeProjectMapper.findProjectsByEmployeeId(employee.getId());
+
+            projects.forEach(p -> System.out.println("Project: " + p.getName()));
+
+            // 8. Info
+            List<EmployeeProjectInfo> infoList = employeeMapper.getEmployeeProjectInfo(employee.getId());
+
+            EmployeeProjectInfo info = infoList.getFirst();
+            System.out.println("Employee ID: " + info.getEmployeeId());
+            System.out.println("Employee Name: " + info.getEmployeeName());
+            System.out.println("Project ID: " + info.getProjectId());
+            System.out.println("Project Name: " + info.getProjectName());
+            System.out.println("Department Name: " + info.getDepartmentName());
+            System.out.println("Company Name: " + info.getCompanyName());
+        }
     }
 }
